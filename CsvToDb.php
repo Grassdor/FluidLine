@@ -1,8 +1,11 @@
 <?php
 namespace App;
 
+require_once("/Develop/FluidLine/Config/Config.php");
+
 use PDOException;
 use PDO;
+use Config\Config;
 
 class CsvToDb
 {
@@ -22,26 +25,30 @@ class CsvToDb
 
     private function updateDb(array $data): void //updates data in you DB
     {
-        $dsn = "mysql:dbname=modxlocal;host=localhost:3360"; //you should put you DB dsn, username and password 
-        $username = "modxlocal";
-        $password = "modxlocal";
-        $pdo = new PDO($dsn, $username, $password);
+
+        $db = new Config();
+        $dbConn = $db->dbConn();
+
+        $pdo = new PDO($dbConn["dsn"], $dbConn["username"], $dbConn["password"]);
         $preparedData = $this->dataEncoder($data);
         $contentid = $preparedData[0];
         $pagetitle = $preparedData[1];
         $tmplvarid = $preparedData[2];
         $value = $preparedData[3];
         
-        $sql = $pdo->prepare("UPDATE product_tmplvar_contentvalues SET tmplvarid = :tmplvarid WHERE `value` = :contentid;
-                UPDATE product_tmplvar_data SET `value` = `:value` WHERE `id` = :contentid;
-                UPDATE modx_site_content JOIN product_tmplvar_contentvalues
-                ON modx_site_content.id = product_tmplvar_contentvalues.contentid SET modx_site_content.pagetitle = :pagetitle;");
+        $sql = $pdo->prepare("UPDATE product_tmplvar_data SET `value` = :value
+                              WHERE id = (
+                                SELECT `value` FROM product_tmplvar_contentvalues
+                                WHERE tmplvarid = :tmplvarid
+                                AND contentid = :contentid
+                              )");
 
+        
         $sql->bindParam(':contentid', $contentid);
-        $sql->bindParam(':pagetitle', $pagetitle);
         $sql->bindParam(':tmplvarid', $tmplvarid);
         $sql->bindParam(':value', $value);
         $sql->execute();
+        echo $preparedData[3] . PHP_EOL;
     }
 
     private function dataEncoder(array $data): array //encodes data from Excel encode to UTF-8
