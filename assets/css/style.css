@@ -1,0 +1,23 @@
+.form {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    > input {
+        height: 40px;
+        width: 200px;
+        margin: 0;
+        border-radius: 10px;
+    }
+    > button {
+        margin-top: 20px;
+    }
+}
+
+body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-content: center;
+    flex-wrap: wrap;
+}
