@@ -7,6 +7,7 @@ require_once("/Develop/FluidLine/Config/Config.php");
 use PDOException;
 use PDO;
 use Config\Config;
+use Exception;
 
 class FluidLineForm
 {
@@ -30,6 +31,8 @@ class FluidLineForm
                     $this->updateDb($this->pdo, $k, $v, $key);
                 } catch (PDOException $e) {
                     echo "Ошибка записи в БД: " . $e->getMessage() . PHP_EOL;
+                } catch (Exception $e) {
+                    echo "Не существует страницы с pagetitle: " . $e->getMessage() . " и значением tplvarid " . $k . PHP_EOL;
                 }
             }
         }
@@ -74,7 +77,9 @@ class FluidLineForm
             $getParent->execute();
 
             $parentResponse = $getParent->fetch(PDO::FETCH_ASSOC);
-
+            if (!$parentResponse) {
+                throw new Exception($pagetitle, $tmplvarid);
+            }
             $insert = $pdo->prepare("
                 INSERT INTO `product_tmplvar_data` (`id`, `parent`, `value`) VALUES (NULL, :parent, :valuen)
             ");
