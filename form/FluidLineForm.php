@@ -1,4 +1,5 @@
-<?php 
+<?php
+
 namespace App\Form;
 
 require_once("/Develop/FluidLine/Config/Config.php");
@@ -21,57 +22,82 @@ class FluidLineForm
         $this->pdo = new PDO($dbConn["dsn"], $dbConn["username"], $dbConn["password"]);
     }
 
-    public function processForm()
+    public function processInput(array $data): void
     {
-        $rowPosition = 0;
-        
-        while ($lineArr = fgetcsv($file, separator: ";")) {
-            if ($rowPosition) {
+        foreach ($data as $key => $rows) {
+            foreach ($rows as $k => $v) {
                 try {
-                    $this->updateDb($this->pdo, $lineArr);
+                    $this->updateDb($this->pdo, $k, $v, $key);
                 } catch (PDOException $e) {
                     echo "Ошибка записи в БД: " . $e->getMessage() . PHP_EOL;
                 }
             }
-            
-            $rowPosition++;
         }
     }
 
-    private function updateDb(PDO $pdo, array $data): void //updates data in you DB
+    private function updateDb(PDO $pdo, string $tmplvarid, string $valuen, string $pagetitle): void //updates data in you DB
     {
-        $preparedData = $this->dataEncoder($data);
-        $contentid = $preparedData[0];
-        $pagetitle = $preparedData[1];
-        $tmplvarid = $preparedData[2];
-        $value = $preparedData[3];
-
         $getId = $pdo->prepare("
-            SELECT `value` FROM `product_tmplvar_contentvalues`
-            WHERE `tmplvarid` = :tmplvarid AND `contentid` = :contentid
+            SELECT id FROM `product_tmplvar_data`
+            WHERE id = (
+                SELECT `value` FROM `product_tmplvar_contentvalues`
+                WHERE `tmplvarid` = :tmplvarid AND `contentid` = (
+                    SELECT `id` FROM `modx_site_content` WHERE `pagetitle` = :pagetitle))
         ");
-        
-        $getId->bindParam('contentid', $contentid);
+
+        $getId->bindParam('pagetitle', $pagetitle);
         $getId->bindParam('tmplvarid', $tmplvarid);
         $getId->execute();
 
         $response = $getId->fetch(PDO::FETCH_ASSOC);
 
-        if (isset($response['value'])) {
-            if (!in_array((int) $response['value'], $this->updatedValues)) {
+        if (isset($response["id"])) {
+            if (!in_array((int) $response["id"], $this->updatedValues)) {
                 $sql = $pdo->prepare("
                     UPDATE `product_tmplvar_data` AS ptd SET ptd.`value` = :valuen
                     WHERE `id` = :idn;
                 ");
-    
-                $sql->bindParam('valuen', $value);
-                $sql->bindParam('idn', $response['value']);
-            
-                $sql->execute();
 
-                $this->updatedValues[] = $response['value'];
+                $sql->bindParam('valuen', $valuen);
+                $sql->bindParam('idn', $response["id"]);
+
+                $sql->execute();
+                $this->updatedValues[] = $response["id"];
             }
+        } else {
+            $getParent = $pdo->prepare("
+                SELECT `parent` FROM `modx_site_content`
+                WHERE `pagetitle` = :pagetitle
+            ");
+
+            $getParent->bindParam('pagetitle', $pagetitle);
+            $getParent->execute();
+
+            $parentResponse = $getParent->fetch(PDO::FETCH_ASSOC);
+
+            $insert = $pdo->prepare("
+                INSERT INTO `product_tmplvar_data` (`id`, `parent`, `value`) VALUES (NULL, :parent, :valuen)
+            ");
+
+            $insert->bindParam('valuen', $valuen);
+            $insert->bindParam('parent', $parentResponse["parent"]);
+            $insert->execute();
+
+            $newId = $pdo->lastInsertId();
+
+            $update = $pdo->prepare("
+                UPDATE `product_tmplvar_contentvalues` AS ptc SET ptc.`value` = :valuen
+                WHERE id = (
+                    SELECT `id` FROM `product_tmplvar_contentvalues`
+                    WHERE `tmplvarid` = :tmplvarid AND `contentid` = (
+                        SELECT `id` FROM `modx_site_content` WHERE `pagetitle` = :pagetitle))
+            ");
+
+            $update->bindParam('valuen', $newId);
+            $update->bindParam('pagetitle', $pagetitle);
+            $update->bindParam('tmplvarid', $tmplvarid);
+
+            $update->execute();
         }
     }
 }
-?>
