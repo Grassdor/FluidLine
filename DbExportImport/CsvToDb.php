@@ -1,8 +1,8 @@
 <?php
 
-namespace App;
+namespace App\DbExportImport;
 
-require_once("/Develop/FluidLine/Config/Config.php");
+require_once("../Config/Config.php");
 
 use PDOException;
 use PDO;

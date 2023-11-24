@@ -14,7 +14,7 @@ class MailProcessor
         $words = preg_split("/\r\n|\r/", $content);
         foreach ($words as $word) {
             
-            $domen = $this->processWord($word);
+            $domen = $this->processWord($word, $words);
             if (!in_array($domen, $this->unifyDomens)) {
                 $this->unifyDomens[] = $domen;
                 $this->unifyMails[] = $word;
@@ -24,23 +24,31 @@ class MailProcessor
         $this->unifyMailList($this->unifyMails);
     }
 
-    private function processWord(string $word)
+    private function processWord(string $word, array $words): string
     {
+        $fn = function(string $w) {
+            $wl = preg_split('/[@]/', $w);
+            return $wl[1];
+        };
+
         if (!empty($word)) {
             $wordLetters = preg_split('/[@]/', $word);
-            $folderName = implode("_", preg_split('/\./', $wordLetters[1]));
-            $folderPath = "library/{$folderName}";
-            if (!file_exists($folderPath)) {
-                mkdir($folderPath, 0777, true);
+            $shortedArray = array_map($fn, $words);
+            $countedShortedArray = array_count_values($shortedArray);
+            if ($countedShortedArray[$wordLetters[1]] > 1) {
+                $folderName = implode("_", preg_split('/\./', $wordLetters[1]));
+                $folderPath = "library";
+                if (!file_exists($folderPath)) {
+                    mkdir($folderPath, 0777, true);
+                }
+                $filePath = fopen("library/{$folderName}.csv", "a+");
+                
+                fputcsv($filePath, [iconv("UTF-8", "Windows-1251", $word)]);
+                fclose($filePath);
             }
-            $filePath = fopen("library/{$folderName}/domens.csv", "a+");
             
-            fputcsv($filePath, [iconv("UTF-8", "Windows-1251", $word)]);
-            fclose($filePath);
             
 
-        } else {
-            echo "No match found for word: $word\n";
         }
 
         return $wordLetters[1];
@@ -53,24 +61,25 @@ class MailProcessor
             $words = preg_split("/\r\n|\r/", $content);
 
             foreach ($words as $word) {
-                $domen = $this->processWord($word);
+                $domen = $this->processWord($word, $words);
                 if (!in_array($domen, $this->unifyDomens)) {
                     $this->unifyDomens[] = $domen;
                     $this->unifyMails[] = $word;
                 }
             }
             $this->unifyMailList($this->unifyMails);
+            return $this->unifyDomens;
         }
     }
 
     private function unifyMailList(array $list): void
     {
         foreach ($list as $item) {
-            $folderPath = "library/!unify";
+            $folderPath = "library";
             if (!file_exists($folderPath)) {
                 mkdir($folderPath, 0777, true);
             }
-            $filePath = fopen("library/!unify/domens.csv", "a+");
+            $filePath = fopen("library/!unify.csv", "a+");
             fputcsv($filePath, [iconv("UTF-8", "Windows-1251", $item)]);
             fclose($filePath);
         }
