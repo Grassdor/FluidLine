@@ -1,7 +1,7 @@
 <?php
-require_once("/Develop/FluidLine/CsvToDb.php");
+require_once("CsvToDb.php");
 
-use App\CsvToDb;
+use App\DbExportImport\CsvToDb;
 
 $fp = fopen('files/import/dbExport.csv', 'r'); //insert path to you csv file instead of "db_to_csv.csv"
 $updateDb = new CsvToDb();
